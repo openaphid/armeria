@@ -4,23 +4,21 @@ import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_LENGTH;
 import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_TYPE;
 import static io.netty.handler.codec.http.HttpHeaderNames.DATE;
 import static io.netty.handler.codec.http.HttpHeaderNames.SERVER;
-import static io.netty.handler.codec.http.HttpHeaderValues.APPLICATION_JSON;
 import static io.netty.handler.codec.http.HttpHeaderValues.TEXT_PLAIN;
 import static io.netty.handler.codec.http.HttpResponseStatus.NOT_FOUND;
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
 import java.io.IOException;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.Arrays;
-import java.util.Date;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import com.jsoniter.output.JsonStream;
 import com.jsoniter.output.JsonStreamPool;
 import com.jsoniter.spi.JsonException;
+
+import com.linecorp.armeria.common.util.Version;
+import com.linecorp.armeria.internal.common.ArmeriaHttpUtil;
+import com.linecorp.armeria.internal.common.util.HttpTimestampSupplier;
 
 import example.armeria.server.techempower.models.Message;
 import io.netty.buffer.ByteBuf;
@@ -34,16 +32,8 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.util.AsciiString;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
-import io.netty.util.concurrent.FastThreadLocal;
 
 public class HelloServerHandler extends ChannelInboundHandlerAdapter {
-
-    private static final FastThreadLocal<DateFormat> FORMAT = new FastThreadLocal<DateFormat>() {
-        @Override
-        protected DateFormat initialValue() {
-            return new SimpleDateFormat("E, dd MMM yyyy HH:mm:ss z");
-        }
-    };
 
     private static Message newMsg() {
         return new Message("Hello, World!");
@@ -62,30 +52,19 @@ public class HelloServerHandler extends ChannelInboundHandlerAdapter {
         }
     }
 
-    private static int jsonLen() {
-        return serializeMsg(newMsg()).length;
-    }
-
     private static final byte[] STATIC_PLAINTEXT = "Hello, World!".getBytes(CharsetUtil.UTF_8);
     private static final int STATIC_PLAINTEXT_LEN = STATIC_PLAINTEXT.length;
 
     private static final CharSequence PLAINTEXT_CLHEADER_VALUE = AsciiString.cached(
             String.valueOf(STATIC_PLAINTEXT_LEN));
-    private static final int JSON_LEN = jsonLen();
-    private static final CharSequence JSON_CLHEADER_VALUE = AsciiString.cached(String.valueOf(JSON_LEN));
-    private static final CharSequence SERVER_NAME = AsciiString.cached("Netty");
 
-    private volatile CharSequence date = new AsciiString(FORMAT.get().format(new Date()));
+    private static final CharSequence CONTENT_TYPE_JSON = AsciiString.cached("application/json; charset=utf-8");
+    private static final CharSequence SERVER_NAME = AsciiString.cached(
+            "Netty**/" + Version.getAll(ArmeriaHttpUtil.class.getClassLoader())
+                                .get("armeria")
+                                .artifactVersion());
 
-    HelloServerHandler(ScheduledExecutorService service) {
-        service.scheduleWithFixedDelay(new Runnable() {
-            private final DateFormat format = FORMAT.get();
-
-            @Override
-            public void run() {
-                date = new AsciiString(format.format(new Date()));
-            }
-        }, 1000, 1000, TimeUnit.MILLISECONDS);
+    HelloServerHandler() {
     }
 
     @Override
@@ -123,7 +102,7 @@ public class HelloServerHandler extends ChannelInboundHandlerAdapter {
     }
 
     private void writeJsonResponse(ChannelHandlerContext ctx, ByteBuf buf) {
-        ctx.write(makeResponse(buf, APPLICATION_JSON, JSON_CLHEADER_VALUE), ctx.voidPromise());
+        ctx.write(makeResponse(buf, CONTENT_TYPE_JSON, String.valueOf(buf.readableBytes())), ctx.voidPromise());
     }
 
     private FullHttpResponse makeResponse(ByteBuf buf, CharSequence contentType, CharSequence contentLength) {
@@ -131,7 +110,7 @@ public class HelloServerHandler extends ChannelInboundHandlerAdapter {
         response.headers()
                 .set(CONTENT_TYPE, contentType)
                 .set(SERVER, SERVER_NAME)
-                .set(DATE, date)
+                .set(DATE, HttpTimestampSupplier.currentTime())
                 .set(CONTENT_LENGTH, contentLength);
         return response;
     }
