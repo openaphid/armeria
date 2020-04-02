@@ -31,7 +31,7 @@ public class HelloService {
     public HttpResponse jsoniter() {
         return HttpResponse.of(HttpStatus.OK,
                                MediaType.PLAIN_TEXT_UTF_8,
-                               HelloServerHandler.serializeMsg(newMsg()));
+                               HelloServerHandler.jsoniterBytes(newMsg()));
     }
 
     private static Message newMsg() {

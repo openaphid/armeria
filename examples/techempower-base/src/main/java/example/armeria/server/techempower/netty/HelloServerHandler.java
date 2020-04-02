@@ -12,6 +12,8 @@ import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 import java.io.IOException;
 import java.util.Arrays;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jsoniter.output.JsonStream;
 import com.jsoniter.output.JsonStreamPool;
 import com.jsoniter.spi.JsonException;
@@ -39,7 +41,7 @@ public class HelloServerHandler extends ChannelInboundHandlerAdapter {
         return new Message("Hello, World!");
     }
 
-    public static byte[] serializeMsg(Message obj) {
+    public static byte[] jsoniterBytes(Message obj) {
         final JsonStream stream = JsonStreamPool.borrowJsonStream();
         try {
             stream.reset(null);
@@ -49,6 +51,16 @@ public class HelloServerHandler extends ChannelInboundHandlerAdapter {
             throw new JsonException(e);
         } finally {
             JsonStreamPool.returnJsonStream(stream);
+        }
+    }
+
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+    public static byte[] jacksonBytes(Message obj) {
+        try {
+            return mapper.writeValueAsBytes(obj);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -86,8 +98,12 @@ public class HelloServerHandler extends ChannelInboundHandlerAdapter {
                 writePlainResponse(ctx, Unpooled.wrappedBuffer(STATIC_PLAINTEXT));
                 return;
             case "/json":
-                final byte[] json = serializeMsg(newMsg());
-                writeJsonResponse(ctx, Unpooled.wrappedBuffer(json));
+                final byte[] jacksonBytes = jacksonBytes(newMsg());
+                writeJsonResponse(ctx, Unpooled.wrappedBuffer(jacksonBytes));
+                return;
+            case "/jsoniter":
+                final byte[] jsoniterBytes = jsoniterBytes(newMsg());
+                writeJsonResponse(ctx, Unpooled.wrappedBuffer(jsoniterBytes));
                 return;
         }
         final FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1,
