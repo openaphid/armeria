@@ -7,6 +7,7 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linecorp.armeria.common.metric.NoopMeterRegistry;
 import com.linecorp.armeria.server.Server;
 
 import example.armeria.server.techempower.armeria.HelloService;
@@ -21,6 +22,8 @@ public final class Main {
     private static void buildArmeriaServer(int port, Map<String, String> arguments) {
         final Server server = Server.builder()
                                     .http(port)
+                                    .requestTimeoutMillis(0)
+                                    .meterRegistry(NoopMeterRegistry.get())
                                     .channelOption(UnixChannelOption.SO_REUSEPORT, true)
                                     .channelOption(ChannelOption.SO_BACKLOG, 8192)
                                     .channelOption(ChannelOption.SO_REUSEADDR, true)
