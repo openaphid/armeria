@@ -11,6 +11,9 @@ import com.linecorp.armeria.server.Server;
 
 import example.armeria.server.techempower.armeria.HelloService;
 import example.armeria.server.techempower.netty.HelloWebServer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.unix.UnixChannelOption;
+import io.netty.util.ResourceLeakDetector;
 
 public final class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
@@ -18,6 +21,9 @@ public final class Main {
     private static void buildArmeriaServer(int port, Map<String, String> arguments) {
         final Server server = Server.builder()
                                     .http(port)
+                                    .channelOption(UnixChannelOption.SO_REUSEPORT, true)
+                                    .channelOption(ChannelOption.SO_BACKLOG, 8192)
+                                    .channelOption(ChannelOption.SO_REUSEADDR, true)
                                     .annotatedService(new HelloService())
                                     .build();
 
@@ -48,6 +54,10 @@ public final class Main {
             arguments.put(args[i], args[i + 1]);
         }
 
+        if (Objects.equals("1", arguments.getOrDefault("--disable-leak-detector", "1"))) {
+            ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.DISABLED);
+            logger.info("Disabled Netty ResourceLeakDetector");
+        }
 
         switch (type) {
             case "armeria":
