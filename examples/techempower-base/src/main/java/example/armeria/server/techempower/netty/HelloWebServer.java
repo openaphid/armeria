@@ -13,7 +13,6 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
 import io.netty.channel.epoll.Epoll;
-import io.netty.channel.epoll.EpollChannelOption;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.kqueue.KQueue;
@@ -23,6 +22,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetector.Level;
+import io.netty.channel.unix.UnixChannelOption;
 
 public class HelloWebServer {
     private static final Logger logger = LoggerFactory.getLogger(HelloWebServer.class);
@@ -32,9 +32,18 @@ public class HelloWebServer {
     }
 
     private final int port;
+    private boolean useFlushHandler;
 
     public HelloWebServer(int port) {
         this.port = port;
+    }
+
+    public boolean isUseFlushHandler() {
+        return useFlushHandler;
+    }
+
+    public void setUseFlushHandler(boolean useFlushHandler) {
+        this.useFlushHandler = useFlushHandler;
     }
 
     public void run() throws Exception {
@@ -80,13 +89,13 @@ public class HelloWebServer {
             final ServerBootstrap b = new ServerBootstrap();
 
             if (multiplexer == IoMultiplexer.EPOLL) {
-                b.option(EpollChannelOption.SO_REUSEPORT, true);
+                b.option(UnixChannelOption.SO_REUSEPORT, true);
             }
 
             b.option(ChannelOption.SO_BACKLOG, 8192);
             b.option(ChannelOption.SO_REUSEADDR, true);
             b.group(loupGroup).channel(serverChannelClass).childHandler(
-                    new HelloServerInitializer());
+                    new HelloServerInitializer(useFlushHandler));
             b.childOption(ChannelOption.SO_REUSEADDR, true);
 
             final Channel ch = b.bind(inet).sync().channel();
